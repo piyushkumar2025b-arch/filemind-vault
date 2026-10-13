@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --bg-primary: #07090e;
+    --bg-secondary: #0d121d;
+    --bg-tertiary: #131b2a;
+    --card-border: rgba(0, 242, 254, 0.15);
+    --neon-cyan: #00f2fe;
+    --neon-blue: #4facfe;
+    --neon-purple: #7f00ff;
+    --neon-magenta: #e100ff;
+  }
+
+  html.light {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --card-border: rgba(99, 102, 241, 0.2);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    min-height: 100dvh;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Custom Neon Glow Utilities */
+.neon-glow-cyan {
+  box-shadow: 0 0 25px -4px rgba(0, 242, 254, 0.45);
+}
+
+.neon-glow-purple {
+  box-shadow: 0 0 25px -4px rgba(225, 0, 255, 0.4);
+}
+
+.neon-glow-button {
+  box-shadow: 0 4px 20px -2px rgba(0, 242, 254, 0.35), 0 0 12px 0 rgba(225, 0, 255, 0.25);
+}
+
+.neon-border {
+  border-color: rgba(0, 242, 254, 0.22);
+}
+
+.neon-border-active {
+  border-color: rgba(0, 242, 254, 0.6);
+  box-shadow: 0 0 15px -3px rgba(0, 242, 254, 0.3);
+}
+
+.neon-text-gradient {
+  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 35%, #9b51e0 70%, #e100ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.neon-btn-gradient {
+  background: linear-gradient(135deg, #00c6ff 0%, #0072ff 45%, #7f00ff 85%, #d946ef 100%);
+}
+
+.neon-btn-gradient-light {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #a855f7 100%);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 254, 0.4);
+}
+
+/* Safe area padding helper */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 16px);
+}

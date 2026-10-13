@@ -1,0 +1,19 @@
+{
+  "name": "filemind-vault",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "pages_build_output_dir": "./dist",
+  "ai": {
+    "binding": "AI"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "filemind-d1",
+      "database_id": "7df5ae96-e1a7-4658-9aaa-91a2cca56e4e"
+    }
+  ],
+  "$schema": "node_modules/wrangler/config-schema.json"
+}

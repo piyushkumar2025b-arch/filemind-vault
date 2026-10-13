@@ -1,0 +1,6 @@
+{
+  "name": "FileMind - Personal File Vault & AI Companion",
+  "description": "Futuristic mobile-first file vault with document preview, full-text search, offline PWA caching, and Cloudflare AI document chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
