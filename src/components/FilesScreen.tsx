@@ -116,6 +116,30 @@ export const FilesScreen: React.FC<FilesScreenProps> = ({
             <Music className="w-5 h-5" />
           </div>
         );
+      case 'spreadsheet':
+        return (
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <FileText className="w-5 h-5" />
+          </div>
+        );
+      case 'presentation':
+        return (
+          <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+            <FileText className="w-5 h-5" />
+          </div>
+        );
+      case 'ebook':
+        return (
+          <div className="w-10 h-10 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center text-violet-400 shrink-0">
+            <FileText className="w-5 h-5" />
+          </div>
+        );
+      case 'archive':
+        return (
+          <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+            <File className="w-5 h-5" />
+          </div>
+        );
       default:
         return (
           <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0">

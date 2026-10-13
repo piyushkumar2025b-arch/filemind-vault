@@ -21,7 +21,7 @@ import {
   getSetting,
   setSetting,
 } from './services/db';
-import { VaultFile, ChatMessage, StorageStats, CloudflareConfig } from './types';
+import { VaultFile, ChatMessage, StorageStats, CloudflareConfig, GuardLevel } from './types';
 import { Plus, Upload } from 'lucide-react';
 
 export default function App() {
@@ -35,6 +35,10 @@ export default function App() {
   const [chatTargetFile, setChatTargetFile] = useState<VaultFile | null>(null);
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
   const [cloudflareConfig, setCloudflareConfig] = useState<CloudflareConfig | null>(null);
+  const [guardLevel, setGuardLevel] = useState<GuardLevel>(() => {
+    const saved = localStorage.getItem('filemind_guard_level');
+    return saved === 'off' || saved === 'strict' ? saved : 'standard';
+  });
 
   const { isInstallable, isInstalled, isIOS, isOnline, install } = usePWA();
 
@@ -77,6 +81,9 @@ export default function App() {
 
         const savedConfig = await getSetting<CloudflareConfig | null>('cf_config', null);
         setCloudflareConfig(savedConfig);
+
+        const savedGuard = await getSetting<GuardLevel>('guard_level', 'standard');
+        setGuardLevel(savedGuard);
       } catch (err) {
         console.error('Failed to initialize database:', err);
       }
@@ -222,6 +229,7 @@ export default function App() {
             onOpenCitationFile={handleOpenCitationFile}
             initialTargetFile={chatTargetFile}
             cloudflareConfig={cloudflareConfig}
+            guardLevel={guardLevel}
           />
         )}
 
@@ -252,6 +260,12 @@ export default function App() {
             onSaveCloudflareConfig={(cfg) => {
               setCloudflareConfig(cfg);
               setSetting('cf_config', cfg);
+            }}
+            guardLevel={guardLevel}
+            onSaveGuardLevel={(level) => {
+              setGuardLevel(level);
+              setSetting('guard_level', level);
+              localStorage.setItem('filemind_guard_level', level);
             }}
           />
         )}

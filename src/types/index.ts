@@ -1,6 +1,10 @@
 export type FileCategory = 
   | 'pdf' 
   | 'docx' 
+  | 'spreadsheet'
+  | 'presentation'
+  | 'ebook'
+  | 'archive'
   | 'markdown' 
   | 'code' 
   | 'image' 
@@ -42,10 +46,26 @@ export interface VaultFile {
     lineCount?: number;
     wordCount?: number;
     author?: string;
+    sheetName?: string;
+    rows?: number;
+    columns?: number;
+    slideCount?: number;
+    chapters?: number;
+    entries?: number;
   };
   blobUrl?: string; // in-memory object URL
   dataUrl?: string; // cached data URL or text content
 }
+
+/** Image attached to a chat message (persisted as dataURL). */
+export interface ChatAttachment {
+  kind: 'image';
+  name: string;
+  dataUrl: string;
+  analysis?: string; // AI vision description (from /api/vision)
+}
+
+export type GuardLevel = 'off' | 'standard' | 'strict';
 
 export interface ChatCitation {
   fileId: string;
@@ -61,6 +81,9 @@ export interface ChatMessage {
   timestamp: number;
   citations?: ChatCitation[];
   targetedFileId?: string;
+  attachments?: ChatAttachment[];
+  voice?: boolean; // message was dictated via speech-to-text
+  blocked?: boolean; // stopped by guardrails
 }
 
 export type FilterCategory = 'all' | 'docs' | 'images' | 'videos' | 'code' | 'audio';

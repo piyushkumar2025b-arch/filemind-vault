@@ -8,11 +8,12 @@ import {
   Download,
   CloudLightning,
   ShieldCheck,
+  ShieldAlert,
   CheckCircle2,
   Info,
   ExternalLink,
 } from 'lucide-react';
-import { StorageStats, CloudflareConfig } from '../types';
+import { StorageStats, CloudflareConfig, GuardLevel } from '../types';
 import { clearAllLocalCache } from '../services/db';
 
 interface SettingsScreenProps {
@@ -27,6 +28,8 @@ interface SettingsScreenProps {
   onExportVault: () => void;
   cloudflareConfig: CloudflareConfig | null;
   onSaveCloudflareConfig: (config: CloudflareConfig) => void;
+  guardLevel: GuardLevel;
+  onSaveGuardLevel: (level: GuardLevel) => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -41,6 +44,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onExportVault,
   cloudflareConfig,
   onSaveCloudflareConfig,
+  guardLevel,
+  onSaveGuardLevel,
 }) => {
   const [clearingCache, setClearingCache] = useState(false);
   const [clearedNotice, setClearedNotice] = useState(false);
@@ -221,7 +226,48 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </button>
       </div>
 
-      {/* 5. Privacy Notice */}
+      {/* 5. AI Safety Guardrails */}
+      <div className="p-4 rounded-2xl bg-slate-900/40 dark:bg-slate-900/40 light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200">
+        <div className="flex items-center gap-2 mb-3">
+          <ShieldAlert className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 light:text-slate-500">
+            AI Safety Guardrails
+          </h3>
+        </div>
+        <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+          On-device checks run before every message leaves your browser. Blocks harmful requests,
+          prompt-injection attempts, and warns on detected secrets or personal data.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {(
+            [
+              { id: 'off', label: 'Off', desc: 'No filtering' },
+              { id: 'standard', label: 'Standard', desc: 'Block unsafe' },
+              { id: 'strict', label: 'Strict', desc: 'Block + secrets' },
+            ] as { id: GuardLevel; label: string; desc: string }[]
+          ).map((lvl) => (
+            <button
+              key={lvl.id}
+              onClick={() => onSaveGuardLevel(lvl.id)}
+              className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                guardLevel === lvl.id
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                  : 'bg-slate-900/60 dark:bg-slate-900/60 light:bg-slate-50 border-slate-800 dark:border-slate-800 light:border-slate-200 text-slate-400'
+              }`}
+            >
+              {guardLevel === lvl.id ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              <span>{lvl.label}</span>
+              <span className="text-[9px] font-normal text-slate-500">{lvl.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 6. Privacy Notice */}
       <div className="p-4 rounded-2xl bg-slate-900/30 border border-slate-800 text-xs text-slate-400 flex items-start gap-2.5">
         <ShieldCheck className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
         <div>

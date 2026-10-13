@@ -1,6 +1,7 @@
 /**
  * FileMind Cloudflare Pages Function - News API (FREE sources, no keys)
- * Aggregates HackerNews + Dev.to + Lobsters. GET /api/news?topic=ai&limit=10
+ * Aggregates HackerNews + Dev.to + Lobsters + GitHub Trending + Reddit.
+ * GET /api/news?topic=ai&limit=10
  */
 
 const corsHeaders = {
@@ -99,6 +100,42 @@ export async function onRequestGet(context: { request: Request }) {
       points: l.score,
       comments: l.comment_count,
       publishedAt: l.created_at,
+    });
+  }
+
+  // 4. GitHub Trending repos (free, no key) — public search API
+  if (topic === 'tech' || topic === 'ai' || topic === 'security') {
+    const gh = await fetchJSON(
+      `https://api.github.com/search/repositories?q=${encodeURIComponent(topic)}+pushed:>2024-01-01&sort=stars&order=desc&per_page=6`
+    );
+    for (const r of gh?.items ?? []) {
+      items.push({
+        id: `gh-${r.id}`,
+        title: `${r.full_name} — ${r.description ?? ''}`.slice(0, 140),
+        url: r.html_url,
+        source: 'GitHub',
+        points: r.stargazers_count,
+        comments: r.open_issues_count,
+        publishedAt: r.pushed_at,
+      });
+    }
+  }
+
+  // 5. Reddit public search (free, no key, .json endpoint)
+  const reddit = await fetchJSON(
+    `https://www.reddit.com/search.json?q=${encodeURIComponent(topic)}&sort=top&limit=8&t=month`
+  );
+  for (const c of reddit?.data?.children ?? []) {
+    const d = c?.data;
+    if (!d?.title) continue;
+    items.push({
+      id: `rd-${d.id}`,
+      title: d.title.slice(0, 140),
+      url: `https://www.reddit.com${d.permalink}`,
+      source: 'Reddit',
+      points: d.ups,
+      comments: d.num_comments,
+      publishedAt: new Date((d.created_utc ?? 0) * 1000).toISOString(),
     });
   }
 

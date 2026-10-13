@@ -14,7 +14,7 @@ export function searchVaultFiles(
   for (const file of files) {
     // Check category filter
     if (categoryFilter !== 'all') {
-      if (categoryFilter === 'docs' && !['pdf', 'docx', 'markdown', 'text'].includes(file.category)) {
+      if (categoryFilter === 'docs' && !['pdf', 'docx', 'markdown', 'text', 'spreadsheet', 'presentation', 'ebook'].includes(file.category)) {
         continue;
       }
       if (categoryFilter === 'images' && file.category !== 'image') {

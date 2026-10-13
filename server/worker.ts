@@ -35,6 +35,27 @@ function extractText(aiResponse: any): string {
   return JSON.stringify(aiResponse).slice(0, 4000);
 }
 
+// --- AI guardrails (mirror of functions/api/chat.ts + src/services/guardrails.ts) ---
+const BLOCK_PATTERNS: RegExp[] = [
+  /\bhow\s+to\s+(make|build|assemble|create)\b[^.?]{0,40}\b(bomb|explosive|detonator|nerve\s*agent|ricin|malware|keylogger|ransomware)\b/i,
+  /\bhow\s+to\s+(kill|hang)\s+myself\b|\bbest\s+way\s+to\s+(commit\s+suicide|end\s+my\s+life)\b/i,
+  /\b(child|kid|minor|underage)\b[^.?]{0,30}\b(nude|naked|porn|sexual)\b/i,
+  /\bignore\s+(all\s+|any\s+|the\s+|your\s+|previous\s+|above\s+)*(instructions?|rules?|prompts?|guardrails?)\b/i,
+  /\byou\s+are\s+now\s+(dan|jailbroken|evil|unfiltered|uncensored)\b/i,
+  /\bforget\s+(everything|all|your\s+(rules|instructions|training))\b/i,
+];
+
+function isBlocked(prompt: string): boolean {
+  return BLOCK_PATTERNS.some((p) => p.test(prompt));
+}
+
+function sanitizeContext(text: string): string {
+  return (text || '')
+    .split('\n')
+    .filter((l) => !/^\s*(ignore\s+(all|any|the|your|previous|above)?\s*(instructions?|rules?|prompts?)|you\s+are\s+now\s+(dan|jailbroken|evil)|<\s*system\s*>)/i.test(l))
+    .join('\n');
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -63,6 +84,18 @@ export default {
         if (!prompt) {
           return Response.json({ error: 'Missing required field: prompt' }, { status: 400, headers: corsHeaders });
         }
+        // AI guardrail gate
+        if (isBlocked(prompt)) {
+          return Response.json(
+            {
+              response:
+                '🛡️ This request was blocked by AI Safety Guardrails. FileMind refuses to help with harmful, unsafe, or unauthorized content.',
+              blocked: true,
+              model: DEFAULT_MODEL,
+            },
+            { headers: corsHeaders }
+          );
+        }
         const requested = (body.model ?? DEFAULT_MODEL).toString();
         const model = ALLOWED_MODELS.has(requested) ? requested : DEFAULT_MODEL;
         const contextChunks = Array.isArray(body.contextChunks) ? body.contextChunks.slice(0, 12) : [];
@@ -71,6 +104,7 @@ export default {
           .map((c: any) => `Source [${c.fileName ?? 'unknown'}]: ${(c.text ?? '').toString().slice(0, 2000)}`)
           .join('\n\n')
           .slice(0, 12000);
+        contextText = sanitizeContext(contextText);
 
         const systemMessage =
           'You are FileMind AI, a private personal knowledge assistant. Answer accurately based solely on the provided personal file chunks. Cite sources when answering.';

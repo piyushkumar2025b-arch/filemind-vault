@@ -50,7 +50,7 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
       setObjectUrl(file.blobUrl);
       return;
     }
-    if (file.category === 'image' || file.category === 'video' || file.category === 'audio') {
+    if (file.category === 'image' || file.category === 'video' || file.category === 'audio' || file.category === 'pdf') {
       setLoadingBlob(true);
       getFileBlob(file.id)
         .then((blob) => {
@@ -158,8 +158,36 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
 
       {/* Viewer Main Canvas */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-start">
-        {/* 1. PDF Viewer */}
-        {file.category === 'pdf' && (
+        {/* 1a. PDF Viewer — native browser renderer when bytes are available */}
+        {file.category === 'pdf' && previewSrc && (
+          <div className="w-full max-w-2xl flex flex-col items-center">
+            <iframe
+              src={`${previewSrc}#page=${currentPage}&toolbar=1&view=FitH`}
+              title={file.name}
+              className="w-full h-[75dvh] rounded-2xl bg-white border border-slate-700 shadow-2xl"
+            />
+            <div className="flex items-center gap-4 mt-4 px-4 py-2 rounded-full bg-slate-900/80 border border-slate-800 shadow-lg">
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-semibold text-slate-200 font-mono">{currentPage} / {totalPages}</span>
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 1b. PDF Viewer fallback — extracted text page */}
+        {file.category === 'pdf' && !previewSrc && (
           <div className="w-full max-w-xl flex flex-col items-center">
             {/* White Paper Page (Matches screenshot) */}
             <div className="w-full min-h-[520px] bg-white text-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-200 flex flex-col justify-between">
@@ -420,6 +448,89 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
                 {loadingBlob ? 'Loading audio…' : 'Audio bytes unavailable — re-upload to play'}
               </div>
             )}
+          </div>
+        )}
+
+        {/* 6.5 Spreadsheet Preview — real table from CSV/TSV/XLSX text extraction */}
+        {file.category === 'spreadsheet' && (
+          <div className="w-full max-w-3xl rounded-2xl bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold">{file.name}</h2>
+                <p className="text-[10px] text-slate-500">
+                  {file.metadata?.rows ? `${file.metadata.rows} rows` : ''}
+                  {file.metadata?.columns ? ` × ${file.metadata.columns} cols` : ''}
+                  {file.metadata?.sheetName ? ` · ${file.metadata.sheetName}` : ''} · Parsed locally
+                </p>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                SPREADSHEET
+              </span>
+            </div>
+            <div className="overflow-auto max-h-[70dvh]">
+              <table className="w-full text-xs border-collapse">
+                <tbody>
+                  {(file.extractedText || '')
+                    .split('\n')
+                    .slice(0, 300)
+                    .map((row, rIdx) => {
+                      const cells = (row.includes('\t') ? row.split('\t') : row.split(/,|;(?! )/)).map((c) => c.trim());
+                      return (
+                        <tr key={rIdx} className={rIdx === 0 ? 'bg-emerald-500/10 dark:bg-emerald-500/10' : 'odd:bg-slate-50 dark:odd:bg-slate-950/40'}>
+                          {cells.map((cell, cIdx) => {
+                            const Tag = rIdx === 0 ? 'th' : 'td';
+                            return (
+                              <Tag
+                                key={cIdx}
+                                className={`px-3 py-1.5 border border-slate-200 dark:border-slate-800 whitespace-nowrap max-w-[280px] truncate ${
+                                  rIdx === 0 ? 'font-bold text-emerald-700 dark:text-emerald-300 text-left' : ''
+                                }`}
+                              >
+                                {cell}
+                              </Tag>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+            {(file.extractedText || '').split('\n').length > 300 && (
+              <div className="px-4 py-2 text-[10px] text-slate-500 border-t border-slate-200 dark:border-slate-800">
+                Showing first 300 of {(file.extractedText || '').split('\n').length} rows · ask the AI for insights on the rest
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 6.6 Presentation / Ebook / Archive preview */}
+        {['presentation', 'ebook', 'archive'].includes(file.category) && (
+          <div className="w-full max-w-xl rounded-2xl bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div className="border-b border-slate-200 dark:border-slate-800 pb-3 mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold truncate">{file.name}</h2>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {file.category === 'presentation' && `${file.metadata?.slideCount ?? '—'} slides · Parsed locally`}
+                  {file.category === 'ebook' && `${file.metadata?.chapters ?? '—'} chapters · ${file.metadata?.author || 'Unknown author'}`}
+                  {file.category === 'archive' && `${file.metadata?.entries ?? '—'} entries · listing`}
+                </p>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${
+                  file.category === 'presentation'
+                    ? 'bg-orange-500/15 text-orange-500 border-orange-500/30'
+                    : file.category === 'ebook'
+                      ? 'bg-violet-500/15 text-violet-500 border-violet-500/30'
+                      : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                }`}
+              >
+                {file.category.toUpperCase()}
+              </span>
+            </div>
+            <div className="text-sm whitespace-pre-wrap leading-relaxed text-slate-800 dark:text-slate-200 max-h-[65dvh] overflow-y-auto">
+              {file.extractedText || 'No content extracted for this file.'}
+            </div>
           </div>
         )}
 

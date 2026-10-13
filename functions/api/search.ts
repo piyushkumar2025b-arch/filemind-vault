@@ -75,7 +75,24 @@ export async function onRequestGet(context: { request: Request }) {
     }
   }
 
-  // 3. Always include a direct-search link
+  // 3. Open Library — books on the topic (free, no key)
+  if (results.length < 6) {
+    const ol = await fetchJSON(
+      `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=3&fields=title,author_name,first_publish_year,key`
+    );
+    for (const doc of ol?.docs ?? []) {
+      if (results.length >= 6) break;
+      if (!doc?.title) continue;
+      results.push({
+        title: `${doc.title}${doc.author_name ? ' — ' + doc.author_name[0] : ''}`.slice(0, 120),
+        url: `https://openlibrary.org${doc.key}`,
+        snippet: `${doc.first_publish_year ? 'First published ' + doc.first_publish_year + '. ' : ''}Open Library book entry.`,
+        source: 'Open Library',
+      });
+    }
+  }
+
+  // 4. Always include a direct-search link
   results.push({
     title: `Web search: ${q}`,
     url: `https://duckduckgo.com/?q=${encodeURIComponent(q)}`,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Youtube, Volume2, QrCode, Newspaper, MessagesSquare, Send } from 'lucide-react';
+import { Youtube, Volume2, QrCode, Newspaper, MessagesSquare, Send, MapPin, Database, Wrench } from 'lucide-react';
 import { VaultFile, CloudflareConfig } from '../types';
 import { YTRunnerSearch, YTPlayer, Track, loadQueue, loadIndex, QUEUE_KEY, INDEX_KEY } from './YTRunner';
 import { ReadAloud } from './ReadAloud';
@@ -7,8 +7,11 @@ import { QRConverter } from './QRConverter';
 import { NewsHub } from './NewsHub';
 import { ModeChat } from './ModeChat';
 import { TelegramPanel } from './TelegramPanel';
+import { MapTracker } from './MapTracker';
+import { SourcesHub } from './SourcesHub';
+import { ToolsPanel } from './ToolsPanel';
 
-type HubSection = 'modes' | 'yt' | 'news' | 'read' | 'qr' | 'telegram';
+type HubSection = 'modes' | 'yt' | 'news' | 'read' | 'qr' | 'telegram' | 'map' | 'sources' | 'tools';
 
 const SECTIONS: { id: HubSection; label: string; icon: React.FC<{ className?: string }>; color: string }[] = [
   { id: 'modes', label: 'Modes', icon: MessagesSquare, color: 'cyan' },
@@ -17,6 +20,9 @@ const SECTIONS: { id: HubSection; label: string; icon: React.FC<{ className?: st
   { id: 'read', label: 'Reader', icon: Volume2, color: 'fuchsia' },
   { id: 'qr', label: 'QR', icon: QrCode, color: 'emerald' },
   { id: 'telegram', label: 'Telegram', icon: Send, color: 'sky' },
+  { id: 'map', label: 'Map', icon: MapPin, color: 'rose' },
+  { id: 'sources', label: 'Sources', icon: Database, color: 'violet' },
+  { id: 'tools', label: 'Tools', icon: Wrench, color: 'orange' },
 ];
 
 export const HubScreen: React.FC<{ files: VaultFile[]; cloudflareConfig: CloudflareConfig | null }> = ({
@@ -72,13 +78,16 @@ export const HubScreen: React.FC<{ files: VaultFile[]; cloudflareConfig: Cloudfl
     fuchsia: 'bg-fuchsia-500/20 border-fuchsia-500/40 text-fuchsia-300',
     emerald: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300',
     sky: 'bg-sky-500/20 border-sky-500/40 text-sky-300',
+    rose: 'bg-rose-500/20 border-rose-500/40 text-rose-300',
+    violet: 'bg-violet-500/20 border-violet-500/40 text-violet-300',
+    orange: 'bg-orange-500/20 border-orange-500/40 text-orange-300',
   };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-4 pb-28 space-y-4">
       <div>
         <h2 className="text-lg font-bold text-white">Command Hub</h2>
-        <p className="text-xs text-slate-400">Chat modes · YT Runner · AI News · Reader · QR · Telegram</p>
+        <p className="text-xs text-slate-400">Chat modes · Music · News · Reader · QR · Telegram · Live Map · Sources · Tools</p>
       </div>
 
       <div className="grid grid-cols-6 gap-1.5">
@@ -110,6 +119,9 @@ export const HubScreen: React.FC<{ files: VaultFile[]; cloudflareConfig: Cloudfl
         {section === 'read' && <ReadAloud files={files} />}
         {section === 'qr' && <QRConverter />}
         {section === 'telegram' && <TelegramPanel />}
+        {section === 'map' && <MapTracker />}
+        {section === 'sources' && <SourcesHub />}
+        {section === 'tools' && <ToolsPanel />}
       </div>
 
       {/* Mini persistent player — visible on every Hub section while queued */}
