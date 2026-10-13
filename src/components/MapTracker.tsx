@@ -222,20 +222,18 @@ export const MapTracker: React.FC = () => {
     if (!q) return;
     setSearching(true);
     try {
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
-        { headers: { Accept: 'application/json' } }
-      );
+      const r = await fetch(`/api/geo?q=${encodeURIComponent(q)}`);
       const j = await r.json();
-      if (Array.isArray(j) && j.length) {
-        setCenter({ lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) });
+      const first = Array.isArray(j.results) && j.results.length ? j.results[0] : null;
+      if (first) {
+        setCenter({ lat: parseFloat(String(first.lat)), lng: parseFloat(String(first.lon)) });
         setZoom(14);
-        setStatus(`Found: ${j[0].display_name}`);
+        setStatus(`Found: ${first.display_name}`);
       } else {
-        setStatus('No location found for that query.');
+        setStatus(j.error || 'No location found for that query.');
       }
     } catch {
-      setStatus('Place search failed (network/CORS).');
+      setStatus('Place search failed (offline?).');
     } finally {
       setSearching(false);
     }
