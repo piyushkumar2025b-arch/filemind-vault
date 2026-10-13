@@ -204,7 +204,7 @@ Redeploy from scratch:
 npm install --legacy-peer-deps
 npm run build
 npx wrangler login
-npx wrangler pages deploy dist --project-name filemind-vault --commit-dirty=true
+npx wrangler pages deploy dist --project-name filemind-vault --branch production --commit-dirty=true
 curl https://filemind-vault.pages.dev/api/health
 curl -X POST https://filemind-vault.pages.dev/api/chat -H "Content-Type: application/json" -d "{\"prompt\":\"ping\",\"contextChunks\":[]}"
 ```
@@ -235,8 +235,17 @@ curl -X POST https://filemind-vault.pages.dev/api/chat \
 
 ## 11. Hub Endpoints & UI (added 2026-10-13)
 
-Latest verified deploy: `6fe99e10.filemind-vault.pages.dev`
+Latest verified production deploy: `cb42c377.filemind-vault.pages.dev`
 (production alias `filemind-vault.pages.dev`).
+
+**Gotcha:** the project's production branch is named `production`, not
+`main`. Plain `wrangler pages deploy dist` from git branch `main` lands
+in **Preview** and leaves the real site stale. Always add
+`--branch production` (the canonical command is now):
+
+```bash
+npx wrangler pages deploy dist --project-name filemind-vault --branch production --commit-dirty=true --skip-caching
+```
 
 ### Edge endpoints (`functions/api/`)
 
