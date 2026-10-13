@@ -232,3 +232,61 @@ curl -X POST https://filemind-vault.pages.dev/api/chat \
   -H "Content-Type: application/json" \
   -d '{"prompt":"Summarize my notes","model":"@cf/meta/llama-3.1-8b-instruct-fp8","contextChunks":[{"id":"c1","fileId":"f1","fileName":"Project-Notes.md","text":"…"}]}'
 ```
+
+## 11. Hub Endpoints & UI (added 2026-10-13)
+
+Latest verified deploy: `6fe99e10.filemind-vault.pages.dev`
+(production alias `filemind-vault.pages.dev`).
+
+### Edge endpoints (`functions/api/`)
+
+| Endpoint | Methods | Auth / cost | Verified |
+|---|---|---|---|
+| `/api/news?topic=&limit=` | GET | free (HN Algolia, Dev.to, Lobsters) | ✅ 200 |
+| `/api/search?q=` | GET | free (DuckDuckGo IA, Wikipedia) | ✅ 200 |
+| `/api/ai-news` | GET | Workers AI (free tier) summarizes `/api/news` | ✅ |
+| `/api/modes` | GET (usage info), POST `{mode, prompt, model?, contextChunks?}` — `chat`/`internet`/`news` | Workers AI | ✅ 200 (internet: 6 sources + cited answer; news: bullet briefing) |
+| `/api/vision` | GET (model list), POST `{image (b64/dataURL), prompt?, model?}` | Workers AI vision (`llama-3.2-11b-vision`, `moondream3.1-9B-A2B`, `llava-1.5-7b`, `qwen-vl`) | ✅ 200 |
+| `/api/voice` | GET (usage), POST `{text (≤2000), lang?}` → `{audio: base64}` | Workers AI `@cf/myshell-ai/melotts` TTS | ✅ 200 |
+| `/api/qr?text=` / POST `{text}` | GET, POST → `{qr: data PNG dataURL}` | free — proxies `api.qrserver.com` (goqr.me) | ✅ 200 (PNG data URL) |
+| `/api/yt` | GET (status), POST `{action:"search"\|"video", q?}` | needs secret `YT_API_KEY` (YouTube Data API v3) | ⚠️ `configured:false` until secret set |
+| `/api/telegram` | GET (status), POST `{action:"info"\|"register"\|"send"}` | needs secret `TELEGRAM_BOT_TOKEN` | ⚠️ `configured:false` until secret set |
+
+Rules learned:
+
+- The `qrcode` npm lib crashes on Workers (needs Node `Buffer`/PNG
+  streams → 500). `functions/api/qr.ts` now proxies the free
+  `api.qrserver.com` render API and base64-chunks the PNG itself.
+- `telegraf` and `youtubei.js` are NOT Worker-compatible (Node APIs);
+  only their HTTP APIs are called from the edge via `fetch`.
+- Free keyless sources: HackerNews Algolia, Dev.to, Lobsters,
+  DuckDuckGo Instant Answer, Wikipedia REST API.
+- Secrets go in with:
+  `wrangler pages secret put YT_API_KEY --project-name filemind-vault`
+  (likewise `TELEGRAM_BOT_TOKEN`), then redeploy.
+
+### Hub UI (`src/components/`)
+
+6th bottom-nav tab **Hub** (`BottomNav.tsx` `NavTab` now includes
+`'hub'`) → `HubScreen.tsx`, a 6-section page:
+
+1. **Modes** — `ModeChat.tsx`: Vault/Internet/News pill switcher,
+   POSTs `/api/modes` with RAG `contextChunks` from the vault,
+   renders answer + clickable sources.
+2. **Music** — `YTRunner.tsx` (`YTRunnerSearch` + `YTPlayer`):
+   queue persisted in `localStorage` (`QUEUE_KEY`/`INDEX_KEY`),
+   Media Session API for background playback in the installed PWA.
+3. **News** — `NewsHub.tsx`: topic pills, `/api/news`, AI briefing
+   via `/api/ai-news`, send-to-Telegram hook.
+4. **Reader** — `ReadAloud.tsx`: `/api/voice` cloud TTS with
+   device `speechSynthesis` fallback; reads vault file or custom
+   text.
+5. **QR** — `QRConverter.tsx`: text/URL → `/api/qr` → download.
+6. **Telegram** — `TelegramPanel.tsx`: check bot, register webhook,
+   get/send messages via `/api/telegram`.
+
+`HubScreen` also renders a mini persistent player when music is
+queued while browsing other Hub sections. `App.tsx` routes
+`currentTab === 'hub'` → `<HubScreen files={files}
+cloudflareConfig={cloudflareConfig} />`.
+

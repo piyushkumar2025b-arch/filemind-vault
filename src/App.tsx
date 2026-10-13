@@ -5,6 +5,7 @@ import { HomeScreen } from './components/HomeScreen';
 import { FilesScreen } from './components/FilesScreen';
 import { ChatScreen } from './components/ChatScreen';
 import { SearchScreen } from './components/SearchScreen';
+import { HubScreen } from './components/HubScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { UploadModal } from './components/UploadModal';
 import { FileViewerModal } from './components/FileViewerModal';
@@ -230,6 +231,10 @@ export default function App() {
             onSelectFile={(file) => setViewingFile(file)}
             initialQuery={searchInitialQuery}
           />
+        )}
+
+        {currentTab === 'hub' && (
+          <HubScreen files={files} cloudflareConfig={cloudflareConfig} />
         )}
 
         {currentTab === 'settings' && (

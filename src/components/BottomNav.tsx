@@ -1,7 +1,14 @@
 import React from 'react';
-import { Home, FolderOpen, MessageSquare, Search, Settings } from 'lucide-react';
+import {
+  Home,
+  FolderOpen,
+  MessageSquare,
+  Search,
+  Settings,
+  LayoutGrid,
+} from 'lucide-react';
 
-export type NavTab = 'home' | 'files' | 'chat' | 'search' | 'settings';
+export type NavTab = 'home' | 'files' | 'chat' | 'search' | 'hub' | 'settings';
 
 interface BottomNavProps {
   currentTab: NavTab;
@@ -14,13 +21,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab })
     { id: 'home', label: 'Home', icon: Home },
     { id: 'files', label: 'Files', icon: FolderOpen },
     { id: 'chat', label: 'Chat', icon: MessageSquare },
+    { id: 'hub', label: 'Hub', icon: LayoutGrid },
     { id: 'search', label: 'Search', icon: Search },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl border-t bg-[#07090e]/95 dark:bg-[#07090e]/95 light:bg-white/95 border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 pb-safe">
-      <div className="max-w-md mx-auto grid grid-cols-5 items-center h-16 px-2">
+      <div className="max-w-md mx-auto grid grid-cols-6 items-center h-16 px-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
