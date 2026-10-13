@@ -63,7 +63,12 @@ export async function onRequestPost(context: { request: Request; env: any }) {
           reply = (ai?.response ?? reply).toString().slice(0, 1000);
         }
       } catch { /* keep default reply */ }
-      await tg(token, 'sendMessage', { chat_id: chatId, text: reply });
+      // Always surface the chat id so the user can paste it into the
+      // Hub Telegram panel (needed for action:"send").
+      await tg(token, 'sendMessage', {
+        chat_id: chatId,
+        text: `${reply}\n\n—\nYour chat ID: ${chatId}\nEnter it in FileMind → Hub → Telegram to enable push sends.`,
+      });
     }
     return Response.json({ ok: true }, { headers: corsHeaders });
   }

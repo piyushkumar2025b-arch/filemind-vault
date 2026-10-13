@@ -258,8 +258,8 @@ npx wrangler pages deploy dist --project-name filemind-vault --branch production
 | `/api/vision` | GET (model list), POST `{image (b64/dataURL), prompt?, model?}` | Workers AI vision (`llama-3.2-11b-vision`, `moondream3.1-9B-A2B`, `llava-1.5-7b`, `qwen-vl`) | ✅ 200 |
 | `/api/voice` | GET (usage), POST `{text (≤2000), lang?}` → `{audio: base64}` | Workers AI `@cf/myshell-ai/melotts` TTS | ✅ 200 |
 | `/api/qr?text=` / POST `{text}` | GET, POST → `{qr: data PNG dataURL}` | free — proxies `api.qrserver.com` (goqr.me) | ✅ 200 (PNG data URL) |
-| `/api/yt` | GET (status), POST `{action:"search"\|"video", q?}` | needs secret `YT_API_KEY` (YouTube Data API v3) | ⚠️ `configured:false` until secret set |
-| `/api/telegram` | GET (status), POST `{action:"info"\|"register"\|"send"}` | needs secret `TELEGRAM_BOT_TOKEN` | ⚠️ `configured:false` until secret set |
+| `/api/yt` | GET (status), POST `{action:"search"\|"video", q?}` | secret `YT_API_KEY` set (YouTube Data API v3) | ✅ `configured:true`, search → 10 videos (Lofi Girl) |
+| `/api/telegram` | GET (status), POST `{action:"info"\|"register"\|"send"}` + Telegram webhook receiver | secret `TELEGRAM_BOT_TOKEN` set; webhook → `https://filemind-vault.pages.dev/api/telegram` | ✅ bot `@CODE1392_bot`, `setWebhook ok:true` |
 
 Rules learned:
 
@@ -272,7 +272,12 @@ Rules learned:
   DuckDuckGo Instant Answer, Wikipedia REST API.
 - Secrets go in with:
   `wrangler pages secret put YT_API_KEY --project-name filemind-vault`
-  (likewise `TELEGRAM_BOT_TOKEN`), then redeploy.
+  (likewise `TELEGRAM_BOT_TOKEN`), then redeploy. **Both are now set**
+  (production env, 2026-10-13); values exist only in Cloudflare — never
+  in code or git. Recommended hardening: in Google Cloud Console restrict
+  the key to the YouTube Data API v3 only.
+- Telegram bot replies include the sender's chat ID so it can be pasted
+  into Hub → Telegram for push sends.
 
 ### Hub UI (`src/components/`)
 
