@@ -109,6 +109,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   const targetFile = files.find((f) => f.id === selectedFileId);
 
+  // Keep the context selector valid when the file list loads/changes
+  // (upload, delete, or first IndexedDB load). Without this the dropdown
+  // points at a stale id and chat silently queries zero chunks.
+  useEffect(() => {
+    if (selectedFileId !== 'all' && !files.some((f) => f.id === selectedFileId)) {
+      setSelectedFileId('all');
+    }
+  }, [files, selectedFileId]);
+
   return (
     <div className="max-w-2xl mx-auto flex flex-col h-[calc(100dvh-3.5rem-4rem)] px-4 pb-2">
       {/* Target File Filter Bar */}

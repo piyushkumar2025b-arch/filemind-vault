@@ -150,16 +150,23 @@ export const FilesScreen: React.FC<FilesScreenProps> = ({
     return b.updatedAt - a.updatedAt;
   });
 
-  const handleDownload = (file: VaultFile) => {
-    const textData = file.extractedText || '';
-    const blob = new Blob([textData], { type: file.mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = file.blobUrl || url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleDownload = async (file: VaultFile) => {
+    try {
+      const { getFileBlob } = await import('../services/db');
+      const stored = await getFileBlob(file.id);
+      const blob =
+        stored || new Blob([file.extractedText || ''], { type: file.mimeType });
+      const url = file.blobUrl && !stored ? file.blobUrl : URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (!file.blobUrl || stored) URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
   };
 
   const handleStartRename = (file: VaultFile) => {

@@ -91,17 +91,37 @@ export async function parseUploadedFile(file: File): Promise<{
       extractedText = result.value;
       metadata.wordCount = extractedText.split(/\s+/).filter(Boolean).length;
     } else if (category === 'pdf') {
-      // Basic text extraction for PDF
+      // Text-first PDF extraction: pull literal string tokens out of the
+      // raw bytes (works for text PDFs without a heavy pdf.js dependency).
+      // Falls back to metadata header when the PDF is scanned/image-only.
       extractedText = `PDF Document: ${file.name}\nSize: ${(file.size / 1024).toFixed(1)} KB`;
-      // Try to read printable strings from PDF arrayBuffer
       try {
         const buffer = await file.arrayBuffer();
         const textDecoder = new TextDecoder('utf-8');
-        const rawString = textDecoder.decode(buffer.slice(0, 50000));
-        // Extract stream texts or plain ASCII words
-        const words = rawString.match(/[A-Za-z0-9\.\,\:\;\-\_]{4,}/g);
-        if (words && words.length > 20) {
-          extractedText += '\n\nExtracted PDF terms:\n' + words.slice(0, 300).join(' ');
+        const rawString = textDecoder.decode(buffer.slice(0, 200000));
+        // PDF literal strings live in (parentheses) — far higher signal
+        // than raw byte soup.
+        const literalMatches = rawString.match(/\((?:[^()\\]|\\.){4,}\)/g) || [];
+        const literals = literalMatches
+          .map((s) =>
+            s
+              .slice(1, -1)
+              .replace(/\\n/g, ' ')
+              .replace(/\\(.)/g, '$1')
+              .trim()
+          )
+          .filter((s) => /[A-Za-z]{3,}/.test(s));
+        const literalText = literals.slice(0, 120).join(' ').slice(0, 6000);
+        if (literalText.length > 60) {
+          extractedText += '\n\nExtracted PDF text:\n' + literalText;
+        } else {
+          // Fallback: printable ASCII runs (old behavior, capped).
+          const words = rawString.match(/[A-Za-z0-9.,:;\-_]{4,}/g);
+          if (words && words.length > 20) {
+            extractedText += '\n\nExtracted PDF terms:\n' + words.slice(0, 300).join(' ');
+          } else {
+            extractedText += '\n\nNote: this PDF appears scanned/image-only — no text layer found.';
+          }
         }
       } catch (err) {
         console.warn('PDF stream extraction fallback:', err);
@@ -109,7 +129,13 @@ export async function parseUploadedFile(file: File): Promise<{
       metadata.pageCount = Math.max(1, Math.round(file.size / (60 * 1024)));
     } else if (category === 'image') {
       previewUrl = URL.createObjectURL(file);
-      extractedText = `Image: ${file.name} (${extension.toUpperCase()}, ${(file.size / 1024).toFixed(1)} KB)`;
+      // Images have no text layer — index a rich descriptor so search +
+      // RAG can still find/ground them (fixes "Design-UI.png (Line 1):
+      // explain" returning zero chunks).
+      extractedText =
+        `Image: ${file.name} (${extension.toUpperCase()}, ${(file.size / 1024).toFixed(1)} KB). ` +
+        `Visual content — use the image preview to inspect it. ` +
+        `File name keywords: ${file.name.replace(/[._-]+/g, ' ')}.`;
     } else if (category === 'video' || category === 'audio') {
       previewUrl = URL.createObjectURL(file);
       extractedText = `Media Recording: ${file.name} (${extension.toUpperCase()}, ${(file.size / 1024 / 1024).toFixed(2)} MB)`;

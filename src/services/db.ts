@@ -66,9 +66,12 @@ export async function getFile(id: string): Promise<VaultFile | null> {
 
 export async function saveFile(file: VaultFile, blob?: Blob): Promise<void> {
   const db = await openDB();
+  // Never persist in-memory blob: URLs — they die on reload and break
+  // preview/download for every file loaded back from IndexedDB.
+  const { blobUrl: _dropped, ...storable } = file;
   return new Promise((resolve, reject) => {
     const tx = db.transaction(['files', 'blobs'], 'readwrite');
-    tx.objectStore('files').put(file);
+    tx.objectStore('files').put(storable as VaultFile);
     if (blob) {
       tx.objectStore('blobs').put({ id: file.id, blob, mimeType: file.mimeType });
     }

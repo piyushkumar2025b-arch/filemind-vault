@@ -22,12 +22,15 @@ export function retrieveRelevantChunks(
   targetFileId?: string,
   maxChunks: number = 4
 ): RAGContext {
-  const queryLower = query.toLowerCase();
+  const queryLower = query.toLowerCase().trim();
   const queryWords = queryLower.split(/\s+/).filter((w) => w.length > 2);
 
-  const eligibleFiles = targetFileId
+  let eligibleFiles = targetFileId
     ? files.filter((f) => f.id === targetFileId)
     : files;
+  // Target-file chat must always have context: fall back to whole vault
+  // if the target file has no indexed text (e.g. image without OCR).
+  if (eligibleFiles.length === 0) eligibleFiles = files;
 
   interface ScoredChunk {
     chunk: FileChunk;
@@ -35,6 +38,13 @@ export function retrieveRelevantChunks(
   }
 
   const scored: ScoredChunk[] = [];
+  // Greeting / acknowledgement queries carry no keywords — still ground
+  // them in the target file instead of returning zero chunks.
+  const isGreeting =
+    queryWords.length === 0 ||
+    /^(hi+|hie+|hello+|hey+|yo|thanks?|thank you|ok|okay|yes|no|please|explain|summariz(e|e this|ation)|tell me|describe)\b/.test(
+      queryLower
+    );
 
   for (const file of eligibleFiles) {
     if (!file.chunks || file.chunks.length === 0) {
@@ -49,7 +59,12 @@ export function retrieveRelevantChunks(
             text: textSample,
             line: 1,
           },
-          score: queryWords.some((w) => textSample.toLowerCase().includes(w)) ? 5 : 1,
+          score:
+            isGreeting || queryWords.some((w) => textSample.toLowerCase().includes(w))
+              ? 5
+              : targetFileId && file.id === targetFileId
+                ? 2
+                : 1,
         });
       }
       continue;
@@ -60,7 +75,7 @@ export function retrieveRelevantChunks(
       let score = 0;
 
       // Exact phrase match bonus
-      if (textLower.includes(queryLower)) {
+      if (queryLower && textLower.includes(queryLower)) {
         score += 20;
       }
 
@@ -72,8 +87,16 @@ export function retrieveRelevantChunks(
       }
 
       // File name match bonus
-      if (file.name.toLowerCase().includes(queryLower)) {
+      if (queryLower && file.name.toLowerCase().includes(queryLower)) {
         score += 6;
+      }
+
+      // Target-file grounding: when chatting about one file, its chunks
+      // are always relevant even for vague queries ("explain", "hie").
+      if (targetFileId && file.id === targetFileId) {
+        score += isGreeting ? 10 : 3;
+      } else if (isGreeting && score === 0) {
+        score += 1;
       }
 
       if (score > 0) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Download,
@@ -16,6 +16,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { VaultFile } from '../types';
+import { getFileBlob } from '../services/db';
 
 interface FileViewerModalProps {
   file: VaultFile | null;
@@ -34,6 +35,43 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [activeTab, setActiveTab] = useState<'preview' | 'source'>('preview');
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [loadingBlob, setLoadingBlob] = useState(false);
+
+  // Rehydrate the real file bytes from IndexedDB. file.blobUrl is an
+  // in-memory URL that does not survive reloads (and is no longer
+  // persisted), so image/video/audio preview + download must rebuild it.
+  useEffect(() => {
+    let revoked = false;
+    let url: string | null = null;
+    setObjectUrl(null);
+    if (!file) return;
+    if (file.blobUrl) {
+      setObjectUrl(file.blobUrl);
+      return;
+    }
+    if (file.category === 'image' || file.category === 'video' || file.category === 'audio') {
+      setLoadingBlob(true);
+      getFileBlob(file.id)
+        .then((blob) => {
+          if (revoked) return;
+          if (blob) {
+            url = URL.createObjectURL(blob);
+            setObjectUrl(url);
+          }
+        })
+        .catch((err) => console.warn('Could not load file blob:', err))
+        .finally(() => {
+          if (!revoked) setLoadingBlob(false);
+        });
+    }
+    return () => {
+      revoked = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [file?.id]);
+
+  const previewSrc = objectUrl || file.blobUrl || null;
 
   const totalPages = file.metadata?.pageCount || 3;
 
@@ -45,16 +83,23 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
     }
   };
 
-  const handleDownload = () => {
-    const textData = file.extractedText || '';
-    const blob = new Blob([textData], { type: file.mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = file.blobUrl || url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const handleDownload = async () => {
+    try {
+      // Prefer the real stored bytes (binary files download correctly).
+      const stored = await getFileBlob(file.id);
+      const blob =
+        stored || new Blob([file.extractedText || ''], { type: file.mimeType });
+      const url = previewSrc && stored ? previewSrc : URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (!previewSrc || !stored) URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
   };
 
   return (
@@ -290,11 +335,16 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
           <div className="w-full max-w-2xl flex flex-col items-center">
             <div className="relative w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl flex items-center justify-center p-2 min-h-[360px]">
               <img
-                src={file.dataUrl || file.blobUrl || '/icon.svg'}
+                src={previewSrc || file.dataUrl || '/icon.svg'}
                 alt={file.name}
                 className="max-h-[70dvh] object-contain rounded-xl transition-transform duration-200"
                 style={{ transform: `scale(${zoomLevel / 100})` }}
               />
+              {!previewSrc && !file.dataUrl && (
+                <span className="absolute bottom-2 text-[10px] text-slate-500">
+                  {loadingBlob ? 'Loading image…' : 'Image bytes unavailable'}
+                </span>
+              )}
             </div>
 
             {/* Zoom Controls */}
@@ -329,9 +379,9 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
         {file.category === 'video' && (
           <div className="w-full max-w-2xl rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-2xl flex flex-col">
             <div className="relative aspect-video w-full bg-black flex items-center justify-center">
-              {file.blobUrl ? (
+              {previewSrc ? (
                 <video
-                  src={file.blobUrl}
+                  src={previewSrc}
                   controls
                   className="w-full h-full object-contain"
                   autoPlay={false}
@@ -342,7 +392,9 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
                     <Maximize2 className="w-8 h-8" />
                   </div>
                   <h3 className="text-base font-bold text-white">{file.name}</h3>
-                  <p className="text-xs text-slate-400 mt-1">Video Stream Ready (1m 24s)</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {loadingBlob ? 'Loading video…' : 'Video bytes unavailable — re-upload to preview'}
+                  </p>
                 </div>
               )}
             </div>
@@ -361,11 +413,11 @@ export const FileViewerModal: React.FC<FileViewerModalProps> = ({
             </div>
             <h3 className="text-base font-bold text-white">{file.name}</h3>
             <p className="text-xs text-slate-400 mt-1 mb-6">High-Fidelity Audio Stream</p>
-            {file.blobUrl ? (
-              <audio src={file.blobUrl} controls className="w-full" />
+            {previewSrc ? (
+              <audio src={previewSrc} controls className="w-full" />
             ) : (
               <div className="p-3 rounded-xl bg-slate-950 text-xs text-slate-400 font-mono">
-                Simulated Audio Track (44.1 kHz, Stereo)
+                {loadingBlob ? 'Loading audio…' : 'Audio bytes unavailable — re-upload to play'}
               </div>
             )}
           </div>
