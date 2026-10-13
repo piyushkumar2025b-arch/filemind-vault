@@ -11,6 +11,7 @@ interface Env {
 interface ChatRequest {
   prompt: string;
   model?: string;
+  webSearch?: boolean; // real-time internet access via /api/websearch
   contextChunks?: Array<{
     id: string;
     fileId: string;
@@ -127,19 +128,53 @@ export async function onRequestPost(context: { request: Request; env: Env }) {
   // Neutralize any injection-style lines hidden in uploaded documents.
   contextText = sanitizeContext(contextText);
 
-  const systemMessage =
-    'You are FileMind AI, a private personal knowledge assistant. Answer accurately based solely on the provided personal file chunks. Cite sources when answering.';
+  // --- Real-time internet access: live web results injected into the prompt ---
+  let webResults: Array<{ title: string; url: string; snippet: string; source?: string }> = [];
+  if (body.webSearch) {
+    try {
+      const origin = new URL(request.url).origin;
+      const wc = new AbortController();
+      const wt = setTimeout(() => wc.abort(), 12000);
+      const wr = await fetch(`${origin}/api/websearch?q=${encodeURIComponent(prompt.slice(0, 200))}`, {
+        signal: wc.signal,
+      });
+      clearTimeout(wt);
+      if (wr.ok) {
+        const wj = await wr.json();
+        webResults = Array.isArray(wj.results) ? wj.results.slice(0, 8) : [];
+      }
+    } catch (err: any) {
+      console.warn('websearch failed:', err?.message);
+    }
+  }
+  const webText = webResults
+    .map((w, i) => `[${i + 1}] ${w.title}\n    URL: ${w.url}\n    ${(w.snippet || '').slice(0, 220)}`)
+    .join('\n');
+
+  const systemMessage = [
+    'You are FileMind AI, a private personal knowledge assistant with real-time internet access.',
+    'Answer accurately using the provided personal file chunks AND, when present, the live web results below.',
+    'When you use web information, cite sources inline using their [n] number and mention the URL.',
+    'Code requirements: ALWAYS wrap code in fenced blocks with the language tag, e.g. ```python ... ```',
+    'Be concise, well-structured and helpful. Use short paragraphs and bullet points.',
+    contextText ? `\n--- PERSONAL FILE CONTEXT ---\n${contextText}` : '',
+    webText
+      ? `\n--- LIVE WEB RESULTS (fetched moments ago — real-time) ---\n${webText}\nUse these for anything time-sensitive (prices, news, versions, dates, scores). If web results are irrelevant, rely on your own knowledge.`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   try {
     if (env.AI) {
       const aiResponse = await env.AI.run(model, {
         messages: [
-          { role: 'system', content: `${systemMessage}\n\n${contextText}` },
+          { role: 'system', content: systemMessage },
           { role: 'user', content: prompt },
         ],
       });
       const text = extractText(aiResponse);
-      return Response.json({ response: text, model }, { headers: corsHeaders });
+      return Response.json({ response: text, model, webResults }, { headers: corsHeaders });
     }
     return Response.json(
       {

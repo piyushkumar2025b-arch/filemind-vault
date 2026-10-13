@@ -1,4 +1,4 @@
-import { VaultFile, ChatMessage, ChatCitation, CloudflareConfig, FileChunk } from '../types';
+import { VaultFile, ChatMessage, ChatCitation, CloudflareConfig, FileChunk, WebResult } from '../types';
 
 export const SUPPORTED_CLOUDFLARE_MODELS = [
   { id: '@cf/meta/llama-3.1-8b-instruct-fp8', name: 'Llama 3.1 8B Instruct (Recommended)' },
@@ -165,8 +165,9 @@ export async function askCloudflareWorkersAI(
   query: string,
   files: VaultFile[],
   config: CloudflareConfig | null,
-  targetFileId?: string
-): Promise<{ answer: string; citations: ChatCitation[] }> {
+  targetFileId?: string,
+  webSearch: boolean = false
+): Promise<{ answer: string; citations: ChatCitation[]; webResults?: WebResult[]; blocked?: boolean }> {
   const rag = retrieveRelevantChunks(query, files, targetFileId);
   const targetFile = targetFileId ? files.find((f) => f.id === targetFileId) : null;
   const model = config?.aiModel || '@cf/meta/llama-3.1-8b-instruct-fp8';
@@ -191,6 +192,7 @@ export async function askCloudflareWorkersAI(
         body: JSON.stringify({
           prompt: query,
           model,
+          webSearch,
           contextChunks: rag.chunks,
           targetFileName: targetFile?.name,
         }),
@@ -205,7 +207,12 @@ export async function askCloudflareWorkersAI(
           (typeof data.result?.response === 'string' && data.result.response.trim()) ||
           '';
         if (answer) {
-          return { answer, citations: rag.citations };
+          return {
+            answer,
+            citations: rag.citations,
+            webResults: Array.isArray(data.webResults) && data.webResults.length ? data.webResults : undefined,
+            blocked: data.blocked === true || undefined,
+          };
         }
         // empty but ok → fall through to local engine rather than returning blank
         console.warn(`Worker endpoint ${endpoint} returned empty response, using local RAG engine`);

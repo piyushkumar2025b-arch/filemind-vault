@@ -57,7 +57,18 @@ export const TelegramPanel: React.FC = () => {
         1. Telegram → @BotFather → /newbot → copy token<br />
         2. <code className="text-cyan-300 select-all">wrangler pages secret put TELEGRAM_BOT_TOKEN --project-name filemind-vault</code><br />
         3. Redeploy, then hit <b>Connect webhook</b> below<br />
-        4. Get your chat ID from @userinfobot, paste it to send
+        4. Message your bot — it replies with your chat ID
+      </div>
+
+      <div className="p-3 rounded-xl bg-sky-500/5 border border-sky-500/20 text-[11px] text-slate-300 leading-relaxed">
+        <span className="font-bold text-sky-300">Bot commands & media:</span>
+        <div className="mt-1.5 grid grid-cols-1 gap-1 font-mono text-[10px]">
+          <span><b className="text-sky-300">/image</b> prompt → free AI image (FLUX)</span>
+          <span><b className="text-sky-300">/web</b> query → real-time internet + sources</span>
+          <span><b className="text-sky-300">/code</b> task → code in a highlighted block</span>
+          <span><b className="text-sky-300">/help</b> → full command list</span>
+          <span className="text-slate-400">photo→AI vision · voice→transcript · doc→summary · location→geocode</span>
+        </div>
       </div>
 
       <div className="flex gap-2">

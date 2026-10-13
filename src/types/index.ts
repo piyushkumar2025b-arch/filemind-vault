@@ -65,6 +65,14 @@ export interface ChatAttachment {
   analysis?: string; // AI vision description (from /api/vision)
 }
 
+/** Live web result returned by /api/websearch (real-time internet access). */
+export interface WebResult {
+  title: string;
+  url: string;
+  snippet: string;
+  source?: string;
+}
+
 export type GuardLevel = 'off' | 'standard' | 'strict';
 
 export interface ChatCitation {
@@ -84,6 +92,8 @@ export interface ChatMessage {
   attachments?: ChatAttachment[];
   voice?: boolean; // message was dictated via speech-to-text
   blocked?: boolean; // stopped by guardrails
+  imageUrl?: string; // generated image (dataURL) attached to the message
+  webResults?: WebResult[]; // live web sources used for the answer
 }
 
 export type FilterCategory = 'all' | 'docs' | 'images' | 'videos' | 'code' | 'audio';

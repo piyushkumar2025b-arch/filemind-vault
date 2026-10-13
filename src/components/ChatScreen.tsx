@@ -17,6 +17,8 @@ import {
   Square,
   ShieldAlert,
   X,
+  Globe,
+  Wand2,
 } from 'lucide-react';
 import { VaultFile, ChatMessage, ChatCitation, ChatAttachment, GuardLevel, CloudflareConfig } from '../types';
 import { askCloudflareWorkersAI, SUPPORTED_CLOUDFLARE_MODELS } from '../services/aiCompanion';
@@ -24,6 +26,7 @@ import { saveChatMessage, clearChatHistory } from '../services/db';
 import { scanPrompt, guardRefusal, GuardVerdict } from '../services/guardrails';
 import { useSpeechRecognition, useDeviceSpeaker } from '../hooks/useSpeech';
 import { fileToDataUrl } from '../services/documentParser';
+import { RichContent } from './RichContent';
 
 interface ChatScreenProps {
   files: VaultFile[];
@@ -51,6 +54,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const [selectedFileId, setSelectedFileId] = useState<string>(initialTargetFile?.id || 'all');
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [guardNote, setGuardNote] = useState<string[]>([]);
+  const [webEnabled, setWebEnabled] = useState(false); // real-time internet toggle
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const speaker = useDeviceSpeaker();
@@ -114,6 +118,57 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }
     if (verdict.warnings.length) setGuardNote(verdict.warnings);
 
+    // --- /image slash command: free AI image generation (FLUX / SDXL) ---
+    if (/^\/image\s+/i.test(text)) {
+      const imgPrompt = text.replace(/^\/image\s+/i, '').trim();
+      if (!imgPrompt) return;
+      const imgUserMsg: ChatMessage = {
+        id: 'msg-' + Date.now(),
+        role: 'user',
+        content: `🎨 Generate image: "${imgPrompt}"`,
+        timestamp: Date.now(),
+      };
+      onNewMessage(imgUserMsg);
+      await saveChatMessage(imgUserMsg);
+      setIsThinking(true);
+      try {
+        const r = await fetch('/api/imagegen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: imgPrompt }),
+        });
+        const j = await r.json();
+        const imgReply: ChatMessage = j.image
+          ? {
+              id: 'msg-' + (Date.now() + 1),
+              role: 'assistant',
+              content: `Generated a free AI image for: **"${imgPrompt}"**`,
+              timestamp: Date.now(),
+              imageUrl: `data:image/png;base64,${j.image}`,
+            }
+          : {
+              id: 'msg-' + (Date.now() + 1),
+              role: 'assistant',
+              content: j.error || '⚠️ Image generation failed — try a different prompt.',
+              timestamp: Date.now(),
+              blocked: Boolean(j.blocked),
+            };
+        onNewMessage(imgReply);
+        await saveChatMessage(imgReply);
+      } catch {
+        const errReply: ChatMessage = {
+          id: 'msg-' + (Date.now() + 1),
+          role: 'assistant',
+          content: '⚠️ Image generation is unreachable right now (offline?).',
+          timestamp: Date.now(),
+        };
+        onNewMessage(errReply);
+      } finally {
+        setIsThinking(false);
+      }
+      return;
+    }
+
     // --- Vision: analyze any attached images via /api/vision ---
     let imageAnalysis = '';
     const resolvedAttachments: ChatAttachment[] = [];
@@ -156,12 +211,20 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
     setIsThinking(true);
 
+    // Real-time internet: manual toggle OR auto-detect time-sensitive asks.
+    const useWeb =
+      webEnabled ||
+      /\b(latest|today|news|right now|current|price|weather|stock|score|version|release|2024|2025|2026|live|recent|this week|this month)\b/i.test(
+        text
+      );
+
     try {
       const response = await askCloudflareWorkersAI(
         composedPrompt,
         files,
         cloudflareConfig,
-        selectedFileId !== 'all' ? selectedFileId : undefined
+        selectedFileId !== 'all' ? selectedFileId : undefined,
+        useWeb
       );
 
       const assistantMsg: ChatMessage = {
@@ -171,6 +234,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         timestamp: Date.now(),
         citations: response.citations,
         targetedFileId: selectedFileId !== 'all' ? selectedFileId : undefined,
+        webResults: response.webResults,
+        blocked: response.blocked,
       };
 
       onNewMessage(assistantMsg);
@@ -296,7 +361,50 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                       : 'bg-slate-900/70 dark:bg-slate-900/70 light:bg-white border border-slate-800 dark:border-slate-800 light:border-slate-200 text-slate-200 dark:text-slate-200 light:text-slate-800 rounded-bl-xs shadow-xl'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  <RichContent content={msg.content} />
+
+                  {/* AI-generated image */}
+                  {msg.imageUrl && (
+                    <div className="mt-2.5">
+                      <img
+                        src={msg.imageUrl}
+                        alt="AI generated"
+                        className="rounded-xl max-h-72 border border-slate-700/60 dark:border-slate-700/60 light:border-slate-200"
+                      />
+                      <a
+                        href={msg.imageUrl}
+                        download={`filemind-${msg.id}.png`}
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300"
+                      >
+                        <ExternalLink className="w-3 h-3" /> Download image
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Live web sources used for the answer */}
+                  {msg.webResults && msg.webResults.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 space-y-1.5">
+                      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-emerald-400" /> Live Web Sources
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {msg.webResults.slice(0, 5).map((w, i) => (
+                          <a
+                            key={i}
+                            href={w.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300 cursor-pointer transition-colors max-w-[220px]"
+                            title={w.snippet}
+                          >
+                            <Globe className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{w.title.slice(0, 45)}</span>
+                            <ExternalLink className="w-2.5 h-2.5 ml-0.5 opacity-70 shrink-0" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Blocked-by-guardrails badge */}
                   {msg.blocked && (
@@ -463,11 +571,36 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             {speech.listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
 
+          {/* Real-time internet toggle */}
+          <button
+            type="button"
+            onClick={() => setWebEnabled((v) => !v)}
+            className={`w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
+              webEnabled
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                : 'bg-slate-800/80 dark:bg-slate-800/80 light:bg-slate-100 border-slate-700 dark:border-slate-700 light:border-slate-300 text-slate-400 hover:text-emerald-300'
+            }`}
+            title={webEnabled ? 'Real-time internet: ON' : 'Real-time internet: auto-detect'}
+          >
+            <Globe className={`w-4 h-4 ${webEnabled ? 'animate-pulse' : ''}`} />
+          </button>
+
+          {/* AI image generation */}
+          <button
+            type="button"
+            onClick={() => setInputText((t) => (t.startsWith('/image ') ? t : '/image ' + t))}
+            disabled={isThinking}
+            className="w-10 h-10 shrink-0 rounded-xl bg-slate-800/80 dark:bg-slate-800/80 light:bg-slate-100 border border-slate-700 dark:border-slate-700 light:border-slate-300 flex items-center justify-center text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-40"
+            title="Generate a free AI image (/image your prompt)"
+          >
+            <Wand2 className="w-4 h-4" />
+          </button>
+
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={speech.listening ? 'Listening…' : 'Ask something…'}
+            placeholder={speech.listening ? 'Listening…' : 'Ask anything… /image to generate art'}
             disabled={isThinking}
             className="flex-1 h-12 px-4 rounded-2xl bg-slate-900/80 dark:bg-slate-900/80 light:bg-white text-slate-100 dark:text-slate-100 light:text-slate-900 border border-slate-700/80 dark:border-slate-700/80 light:border-slate-300 focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/20 text-xs sm:text-sm placeholder:text-slate-500 shadow-xl"
           />
@@ -485,7 +618,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         <div className="flex items-center justify-between text-[10px] text-slate-400 px-2 pt-1.5">
           <span className="flex items-center gap-1">
             {guardLevel !== 'off' && <ShieldAlert className="w-3 h-3 text-emerald-400" />}
-            Cloudflare Workers AI · Private RAG
+            <Globe className={`w-3 h-3 ${webEnabled ? 'text-emerald-400' : 'text-slate-500'}`} />
+            Workers AI · RAG {webEnabled ? '+ live internet' : '· web auto'}
           </span>
           <span>{guardLevel === 'off' ? 'Guardrails off' : `Guardrails: ${guardLevel}`}</span>
         </div>
